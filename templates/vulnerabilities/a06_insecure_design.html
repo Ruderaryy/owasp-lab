@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="vuln-page">
+  <a href="/" class="back">← Back</a>
+  <h1>A06 — Insecure Design</h1>
+
+  <div class="explainer">
+    <h2>What is it?</h2>
+    <p>
+      Insecure Design means <strong>security was never considered during the design phase</strong>.
+      Unlike misconfiguration (wrong settings) or injection (bad code),
+      insecure design is a <strong>fundamental architectural flaw</strong> —
+      the feature was built without security in mind at all.
+    </p>
+    <p>
+      A classic example: a login form with <strong>no rate limiting</strong>.
+      An attacker can write a script to try thousands of passwords per second —
+      a <strong>brute force attack</strong> — and the server happily responds to every single one.
+    </p>
+  </div>
+
+  <!-- Brute force visual -->
+  <div class="brute-visual">
+    <div class="brute-attacker"> Attacker Script</div>
+    <div class="brute-requests">
+      <div class="brute-req">password1 →</div>
+      <div class="brute-req">password2 →</div>
+      <div class="brute-req">password3 →</div>
+      <div class="brute-req">... 10,000 more →</div>
+    </div>
+    <div class="brute-server">
+      <div class="brute-vuln"> Vulnerable Server<br><small>responds to all</small></div>
+      <div class="brute-secure"> Secure Server<br><small>blocks after 5</small></div>
+    </div>
+  </div>
+
+  <div class="lab-grid">
+
+    <div class="lab-card vulnerable">
+      <h2> Vulnerable — No Rate Limiting</h2>
+      <p>Keep clicking <strong>Try Wrong Password</strong> — the server never blocks you. An attacker could automate this forever.</p>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <input type="text" id="vuln-user" placeholder="username" value="alice"
+          style="width:220px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <input type="text" id="vuln-pass" placeholder="password" value="wrongpassword"
+          style="width:220px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <div style="display:flex;gap:8px">
+          <button onclick="vulnLogin()">Try Wrong Password</button>
+          <button id="vuln-brute-btn"> Simulate Brute Force</button>
+        </div>
+      </div>
+      <div class="attempt-counter" id="vuln-counter">Attempts: 0</div>
+      <pre id="vuln-result">// result will appear here</pre>
+      <div class="code-block">
+        <h3>Vulnerable Code</h3>
+        <code><pre>
+@app.route("/login", methods=["POST"])
+def login():
+    username = data.get("username")
+    password = data.get("password")
+
+    #  No rate limiting at all!
+    # Attacker can try forever
+    user = db.execute(
+        "SELECT * FROM users
+         WHERE username=? AND password=?",
+        (username, password)
+    ).fetchone()
+
+    if user:
+        return "Logged in!"
+    return "Invalid credentials", 401
+        </pre></code>
+      </div>
+    </div>
+
+    <div class="lab-card secure">
+      <h2> Secure — Rate Limited</h2>
+      <p>After <strong>5 failed attempts</strong>, the server locks you out for 60 seconds.</p>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <input type="text" id="sec-user" placeholder="username" value="alice"
+          style="width:220px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <input type="text" id="sec-pass" placeholder="password" value="wrongpassword"
+          style="width:220px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <div style="display:flex;gap:8px">
+          <button onclick="secureLogin()">Try Wrong Password</button>
+          <button id="sec-brute-btn"> Simulate Brute Force</button>
+        </div>
+      </div>
+      <div class="attempt-counter" id="sec-counter">Attempts: 0</div>
+      <pre id="sec-result">// result will appear here</pre>
+      <div class="code-block">
+        <h3>Secure Code</h3>
+        <code><pre>
+#  Track attempts per IP
+login_attempts[ip] = [
+    t for t in login_attempts[ip]
+    if now - t < 60  # last 60 seconds
+]
+
+if len(login_attempts[ip]) >= 5:
+    return jsonify({
+        "error": "Too many attempts."
+    }), 429  # HTTP 429 = Too Many Requests
+
+login_attempts[ip].append(now)
+# proceed with login check...
+        </pre></code>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="examples-box" style="border-left-color:#f0a500">
+    <h2 style="color:#f0a500">🏗️ More Insecure Design Examples</h2>
+    <div class="examples-grid">
+      <div class="example-card">
+        <h3>No Password Reset Limit</h3>
+        <p>Allowing unlimited password reset emails lets attackers spam users or enumerate valid accounts.</p>
+      </div>
+      <div class="example-card">
+        <h3>Predictable IDs</h3>
+        <p>Using sequential IDs like <code>/order/1001</code>, <code>/order/1002</code> lets attackers enumerate all orders.</p>
+      </div>
+      <div class="example-card">
+        <h3>No CAPTCHA on Sensitive Forms</h3>
+        <p>Signup and login forms without CAPTCHA are trivially automated by bots.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2> Key Takeaway</h2>
+    <ul>
+      <li><strong>Think about security before writing code</strong> — threat model your features during design.</li>
+      <li>Add <strong>rate limiting</strong> to every sensitive endpoint — login, signup, password reset, OTP.</li>
+      <li>Use <strong>HTTP 429</strong> (Too Many Requests) to signal rate limit responses.</li>
+      <li>Consider account lockout, CAPTCHA, and IP blocking as layered defenses.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+let vulnCount = 0;
+let secCount = 0;
+let bruteInterval = null;
+
+async function vulnLogin() {
+  const res = await fetch("/a06/vulnerable/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("vuln-user").value,
+      password: document.getElementById("vuln-pass").value
+    })
+  });
+  const data = await res.json();
+  vulnCount++;
+  document.getElementById("vuln-counter").textContent = `Attempts: ${vulnCount}`;
+  document.getElementById("vuln-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function secureLogin() {
+  const res = await fetch("/a06/secure/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("sec-user").value,
+      password: document.getElementById("sec-pass").value
+    })
+  });
+  const data = await res.json();
+  secCount++;
+  document.getElementById("sec-counter").textContent = `Attempts: ${secCount}`;
+  document.getElementById("sec-result").textContent = JSON.stringify(data, null, 2);
+  // stop brute force sim if blocked
+  if (res.status === 429 && bruteInterval) {
+    clearInterval(bruteInterval);
+    bruteInterval = null;
+    document.getElementById("sec-brute-btn").textContent = " Simulate Brute Force";
+  }
+}
+
+// Brute force simulation buttons
+document.getElementById("vuln-brute-btn").addEventListener("click", function() {
+  let count = 0;
+  const passwords = ["abc","123","qwerty","letmein","monkey","dragon","pass","test","hello","admin"];
+  const interval = setInterval(async () => {
+    if (count >= passwords.length) { clearInterval(interval); return; }
+    document.getElementById("vuln-pass").value = passwords[count];
+    await vulnLogin();
+    count++;
+  }, 300);
+});
+
+document.getElementById("sec-brute-btn").addEventListener("click", function() {
+  if (bruteInterval) return;
+  let count = 0;
+  const passwords = ["abc","123","qwerty","letmein","monkey","dragon","pass","test","hello","admin"];
+  this.textContent = " Running...";
+  bruteInterval = setInterval(async () => {
+    if (count >= passwords.length) {
+      clearInterval(bruteInterval);
+      bruteInterval = null;
+      document.getElementById("sec-brute-btn").textContent = "💀 Simulate Brute Force";
+      return;
+    }
+    document.getElementById("sec-pass").value = passwords[count];
+    await secureLogin();
+    count++;
+  }, 300);
+});
+</script>
+{% endblock %}

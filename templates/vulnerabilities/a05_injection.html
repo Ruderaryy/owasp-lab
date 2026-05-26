@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="vuln-page">
+  <a href="/" class="back">← Back</a>
+  <h1>A05 — Injection (SQL Injection)</h1>
+
+  <div class="explainer">
+    <h2>What is it?</h2>
+    <p>
+      SQL Injection happens when <strong>user input is directly embedded into a SQL query</strong>.
+      An attacker can type SQL code as their username/password and completely
+      change what the query does — bypassing login, dumping tables, or deleting data.
+    </p>
+    <p>
+      It's been in the OWASP Top 10 for over a decade and is still one of the
+      most exploited vulnerabilities on the web.
+    </p>
+  </div>
+
+  <div class="sqli-visual">
+    <div class="sqli-step">
+      <div class="sqli-label">Normal query</div>
+      <code>SELECT * FROM users WHERE username='alice' AND password='pass123'</code>
+    </div>
+    <div class="sqli-step injected">
+      <div class="sqli-label">After injection: username = admin'--</div>
+      <code>SELECT * FROM users WHERE username='admin'<span class="injected-part">--' AND password='anything'</span></code>
+      <small style="color:#aaa;margin-top:6px;display:block">Everything after -- is a comment — password check is skipped!</small>
+    </div>
+  </div>
+
+  <div class="lab-grid">
+
+    <div class="lab-card vulnerable">
+      <h2> Vulnerable</h2>
+      <p>Try these attack payloads:</p>
+      <div class="attack-chips">
+        <button class="chip" id="chip-vuln-1">admin'--</button>
+        <button class="chip" id="chip-vuln-2">OR 1=1</button>
+        <button class="chip" id="chip-vuln-3">Normal login</button>
+      </div>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px">
+        <input type="text" id="vuln-user" placeholder="username"
+          style="width:260px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0;font-family:monospace">
+        <input type="text" id="vuln-pass" placeholder="password"
+          style="width:260px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0;font-family:monospace">
+        <button onclick="vulnLogin()">Login</button>
+      </div>
+      <pre id="vuln-result">// result + executed query will show here</pre>
+      <div class="code-block">
+        <h3>Vulnerable Code</h3>
+        <code><pre>
+#  String interpolation — NEVER do this
+query = f"""
+  SELECT * FROM users
+  WHERE username='{username}'
+  AND password='{password}'
+"""
+db.execute(query)
+# attacker controls the query structure!
+        </pre></code>
+      </div>
+    </div>
+
+    <div class="lab-card secure">
+      <h2> Secure</h2>
+      <p>Same injections do nothing — input is treated as <strong>data, not SQL code</strong>.</p>
+      <div class="attack-chips">
+        <button class="chip" id="chip-sec-1">admin'--</button>
+        <button class="chip" id="chip-sec-2">OR 1=1</button>
+        <button class="chip" id="chip-sec-3">Normal login</button>
+      </div>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px">
+        <input type="text" id="sec-user" placeholder="username"
+          style="width:260px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0;font-family:monospace">
+        <input type="text" id="sec-pass" placeholder="password"
+          style="width:260px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0;font-family:monospace">
+        <button onclick="secureLogin()">Login</button>
+      </div>
+      <pre id="sec-result">// result will show here</pre>
+      <div class="code-block">
+        <h3>Secure Code</h3>
+        <code><pre>
+#  Parameterized query
+# The ? placeholders are filled SAFELY
+# by the DB driver — input is always
+# treated as plain data, never as SQL
+
+db.execute(
+  "SELECT * FROM users
+   WHERE username=? AND password=?",
+  (username, password)
+)
+        </pre></code>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="examples-box" style="border-left-color:#f0a500">
+    <h2 style="color:#f0a500">💉 Common SQL Injection Payloads</h2>
+    <div class="examples-grid">
+      <div class="example-card">
+        <h3>Auth Bypass</h3>
+        <code>admin'--</code>
+        <p style="margin-top:6px">Comments out the password check entirely.</p>
+      </div>
+      <div class="example-card">
+        <h3>Always True</h3>
+        <code>' OR '1'='1</code>
+        <p style="margin-top:6px">Makes the WHERE clause always true — returns all rows.</p>
+      </div>
+      <div class="example-card">
+        <h3>Union Attack</h3>
+        <code>' UNION SELECT * FROM users--</code>
+        <p style="margin-top:6px">Appends a second query to dump another table.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2> Key Takeaway</h2>
+    <ul>
+      <li><strong>Always use parameterized queries</strong> — never build SQL with string formatting.</li>
+      <li>ORMs (like SQLAlchemy) are parameterized by default — prefer them over raw SQL.</li>
+      <li><strong>Validate and sanitize input</strong> — reject unexpected characters on the frontend AND backend.</li>
+      <li>Principle of least privilege — your DB user shouldn't have DROP or admin rights.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+// Chip payloads defined in JS — no quote conflicts in HTML
+const vulnPayloads = {
+  "chip-vuln-1": { user: "admin'--",      pass: "" },
+  "chip-vuln-2": { user: "' OR '1'='1",   pass: "' OR '1'='1" },
+  "chip-vuln-3": { user: "alice",          pass: "pass123" }
+};
+const secPayloads = {
+  "chip-sec-1":  { user: "admin'--",      pass: "" },
+  "chip-sec-2":  { user: "' OR '1'='1",   pass: "' OR '1'='1" },
+  "chip-sec-3":  { user: "alice",          pass: "pass123" }
+};
+
+Object.entries(vulnPayloads).forEach(([id, val]) => {
+  document.getElementById(id).addEventListener("click", () => {
+    document.getElementById("vuln-user").value = val.user;
+    document.getElementById("vuln-pass").value = val.pass;
+  });
+});
+
+Object.entries(secPayloads).forEach(([id, val]) => {
+  document.getElementById(id).addEventListener("click", () => {
+    document.getElementById("sec-user").value = val.user;
+    document.getElementById("sec-pass").value = val.pass;
+  });
+});
+
+async function vulnLogin() {
+  const res = await fetch("/a05/vulnerable/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("vuln-user").value,
+      password: document.getElementById("vuln-pass").value
+    })
+  });
+  const data = await res.json();
+  document.getElementById("vuln-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function secureLogin() {
+  const res = await fetch("/a05/secure/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("sec-user").value,
+      password: document.getElementById("sec-pass").value
+    })
+  });
+  const data = await res.json();
+  document.getElementById("sec-result").textContent = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}

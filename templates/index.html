@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>OWASP Top 10 — Interactive Lab</h1>
+<p>Click a vulnerability to learn how it works and how to fix it.</p>
+<ul class="vuln-list">
+  <li><a href="/a01">A01 — Broken Access Control</a></li>
+  <li><a href="/a02">A02 — Security Misconfiguration</a> </li>
+  <li><a href="/a03">A03 — Software Supply Chain Failures</a> </li>
+  <li><a href="/a04">A04 — Cryptographic Failures</a> </li>
+  <li><a href="/a05">A05 — Injection</a> </li>
+  <li><a href="/a06">A06 — Insecure Design</a> </li>
+  <!-- <li>A07 — Authentication Failures</li>
+  <li>A08 — Software or Data Integrity Failures</li>
+  <li>A09 — Security Logging and Alerting Failures</li>
+  <li>A10 — Mishandling of Exceptional Conditions</li> -->
+</ul>
+{% endblock %}

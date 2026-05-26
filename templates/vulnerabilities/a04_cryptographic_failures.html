@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="vuln-page">
+  <a href="/" class="back">← Back</a>
+  <h1>A04 — Cryptographic Failures</h1>
+
+  <div class="explainer">
+    <h2>What is it?</h2>
+    <p>
+      Cryptographic Failures happen when <strong>sensitive data is not properly protected</strong> —
+      passwords stored in plaintext, weak hashing algorithms (MD5, SHA1),
+      or sensitive data sent over HTTP instead of HTTPS.
+    </p>
+    <p>
+      If an attacker dumps your database and passwords are plaintext —
+      <strong>every account is instantly compromised.</strong>
+      With bcrypt, they get useless hashes that take years to crack.
+    </p>
+  </div>
+
+  <!-- Hash comparison visual -->
+  <div class="hash-visual">
+    <div class="hash-box plain">
+      <div class="hash-label"> Plaintext in DB</div>
+      <div class="hash-value">password123</div>
+    </div>
+    <div class="hash-arrow">vs</div>
+    <div class="hash-box hashed">
+      <div class="hash-label"> bcrypt hash in DB</div>
+      <div class="hash-value small">$2b$12$KIX/mV3sOZBhB0sC9OkXyOQz8GmDkNqF1pR7vW2eL5hA3jN8mPcUa</div>
+    </div>
+  </div>
+
+  <div class="lab-grid">
+
+    <!-- VULNERABLE -->
+    <div class="lab-card vulnerable">
+      <h2> Vulnerable — Plaintext Passwords</h2>
+      <p>Register a user. See exactly what gets stored in the database.</p>
+
+      <h3 style="margin:14px 0 8px;font-size:0.95rem;color:#aaa">Step 1: Register</h3>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <input type="text" id="vuln-reg-user" placeholder="username" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <input type="password" id="vuln-reg-pass" placeholder="password" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <button onclick="vulnRegister()">Register</button>
+      </div>
+      <pre id="vuln-reg-result">// stored password will show here</pre>
+
+      <h3 style="margin:14px 0 8px;font-size:0.95rem;color:#aaa">Step 2: Login</h3>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <input type="text" id="vuln-login-user" placeholder="username" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <input type="password" id="vuln-login-pass" placeholder="password" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <button onclick="vulnLogin()">Login</button>
+      </div>
+      <pre id="vuln-login-result">// login result will show here</pre>
+
+      <div class="code-block">
+        <h3>Vulnerable Code</h3>
+        <code><pre>
+#  Storing raw password
+db.execute(
+  "INSERT INTO users VALUES (?,?)",
+  (username, password)  # "pass123" in DB!
+)
+
+#  Plaintext comparison
+SELECT * FROM users
+WHERE username=? AND password=?
+        </pre></code>
+      </div>
+    </div>
+
+    <!-- SECURE -->
+    <div class="lab-card secure">
+      <h2> Secure — bcrypt Hashing</h2>
+      <p>Same flow — but the DB stores an unreadable hash. Even if stolen, it's useless.</p>
+
+      <h3 style="margin:14px 0 8px;font-size:0.95rem;color:#aaa">Step 1: Register</h3>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <input type="text" id="sec-reg-user" placeholder="username" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <input type="password" id="sec-reg-pass" placeholder="password" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <button onclick="secureRegister()">Register</button>
+      </div>
+      <pre id="sec-reg-result">// stored hash will show here</pre>
+
+      <h3 style="margin:14px 0 8px;font-size:0.95rem;color:#aaa">Step 2: Login</h3>
+      <div class="controls" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <input type="text" id="sec-login-user" placeholder="username" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <input type="password" id="sec-login-pass" placeholder="password" style="width:200px;padding:7px 10px;background:#0f1117;border:1px solid #3a3f58;border-radius:6px;color:#e0e0e0">
+        <button onclick="secureLogin()">Login</button>
+      </div>
+      <pre id="sec-login-result">// login result will show here</pre>
+
+      <div class="code-block">
+        <h3>Secure Code</h3>
+        <code><pre>
+#  Hash before storing
+hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+)
+db.execute(
+  "INSERT INTO users VALUES (?,?)",
+  (username, hashed)  # "$2b$12$..." in DB
+)
+
+#  Safe comparison
+bcrypt.checkpw(
+    password.encode(),
+    stored_hash.encode()
+)
+        </pre></code>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="takeaway">
+    <h2> Key Takeaway</h2>
+    <ul>
+      <li><strong>Never store plaintext passwords</strong> — always hash with bcrypt, scrypt, or Argon2.</li>
+      <li><strong>Never use MD5 or SHA1</strong> for passwords — they are fast to crack. bcrypt is intentionally slow.</li>
+      <li><strong>Use HTTPS</strong> — even hashed passwords can be stolen if sent over plain HTTP.</li>
+      <li>bcrypt includes a <strong>salt automatically</strong> — no two hashes are the same even for identical passwords.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+async function vulnRegister() {
+  const res = await fetch("/a04/vulnerable/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("vuln-reg-user").value,
+      password: document.getElementById("vuln-reg-pass").value
+    })
+  });
+  const data = await res.json();
+  document.getElementById("vuln-reg-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function vulnLogin() {
+  const res = await fetch("/a04/vulnerable/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("vuln-login-user").value,
+      password: document.getElementById("vuln-login-pass").value
+    })
+  });
+  const data = await res.json();
+  document.getElementById("vuln-login-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function secureRegister() {
+  const res = await fetch("/a04/secure/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("sec-reg-user").value,
+      password: document.getElementById("sec-reg-pass").value
+    })
+  });
+  const data = await res.json();
+  document.getElementById("sec-reg-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function secureLogin() {
+  const res = await fetch("/a04/secure/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("sec-login-user").value,
+      password: document.getElementById("sec-login-pass").value
+    })
+  });
+  const data = await res.json();
+  document.getElementById("sec-login-result").textContent = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}

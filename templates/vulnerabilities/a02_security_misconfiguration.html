@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="vuln-page">
+  <a href="/" class="back">← Back</a>
+  <h1>A02 — Security Misconfiguration</h1>
+
+  <div class="explainer">
+    <h2>What is it?</h2>
+    <p>
+      Security Misconfiguration happens when an app is set up insecurely —
+      <strong>debug mode on in production, verbose error messages, default credentials,
+      unnecessary features enabled.</strong>
+    </p>
+    <p>
+      A classic example: an attacker sends a bad request and gets back a full
+      stack trace revealing your file paths, database names, framework versions,
+      and internal logic. That's free recon.
+    </p>
+  </div>
+
+  <div class="lab-grid">
+
+    <!-- VULNERABLE -->
+    <div class="lab-card vulnerable">
+      <h2> Vulnerable</h2>
+      <p>Try a valid ID (1–3), then try a <strong>non-numeric value</strong> like <code>abc</code> or a missing ID.</p>
+      <div class="controls">
+        <label>User ID:</label>
+        <input type="text" id="vuln-id" value="1" style="width:90px">
+        <button onclick="fetchVuln()">Send Request</button>
+      </div>
+      <pre id="vuln-result">// result will appear here</pre>
+      <div class="code-block">
+        <h3>Vulnerable Server Code</h3>
+        <code><pre>
+@app.route("/a02/vulnerable/user")
+def a02_vuln():
+    uid = request.args.get("id")
+    #  Crashes and leaks internal details
+    user = db.execute(
+        "SELECT * FROM users WHERE id=?",
+        (int(uid),)   # throws ValueError if not a number
+    ).fetchone()
+    if not user:
+        raise Exception(
+            f"User {uid} not found. "
+            f"DB: demo.db, Table: users"  #  internal info exposed
+        )
+    return jsonify(user)
+        </pre></code>
+      </div>
+    </div>
+
+    <!-- SECURE -->
+    <div class="lab-card secure">
+      <h2> Secure</h2>
+      <p>Same bad inputs — server returns a <strong>clean generic error</strong> with no internal details.</p>
+      <div class="controls">
+        <label>User ID:</label>
+        <input type="text" id="secure-id" value="1" style="width:90px">
+        <button onclick="fetchSecure()">Send Request</button>
+      </div>
+      <pre id="secure-result">// result will appear here</pre>
+      <div class="code-block">
+        <h3>Secure Server Code</h3>
+        <code><pre>
+@app.route("/a02/secure/user")
+def a02_secure():
+    uid = request.args.get("id")
+    try:
+        if not uid or not uid.isdigit():
+            return jsonify({"error": "Invalid request."}), 400
+        user = db.execute(
+            "SELECT * FROM users WHERE id=?",
+            (int(uid),)
+        ).fetchone()
+        if not user:
+            return jsonify({"error": "User not found."}), 404
+        return jsonify(user)
+    except Exception:
+        #  Log internally, never expose details
+        return jsonify({
+            "error": "Something went wrong."
+        }), 500
+        </pre></code>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="takeaway">
+    <h2> Key Takeaway</h2>
+    <ul>
+      <li><strong>Never run debug mode in production</strong> — Flask's debug mode exposes an interactive console.</li>
+      <li>Always return <strong>generic error messages</strong> to users — log the details server-side only.</li>
+      <li>Disable stack traces, directory listings, and verbose headers in production.</li>
+      <li>Remove default credentials, unused endpoints, and sample apps before deploying.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+async function fetchVuln() {
+  const id = document.getElementById("vuln-id").value;
+  try {
+    const res = await fetch(`/a02/vulnerable/user?id=${id}`);
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      document.getElementById("vuln-result").textContent = JSON.stringify(data, null, 2);
+    } catch {
+      // Show raw HTML error page snippet
+      const stripped = text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 600);
+      document.getElementById("vuln-result").textContent = "⚠️ Server returned HTML error page:\n\n" + stripped;
+    }
+  } catch(e) {
+    document.getElementById("vuln-result").textContent = "Error: " + e.message;
+  }
+}
+
+async function fetchSecure() {
+  const id = document.getElementById("secure-id").value;
+  const res = await fetch(`/a02/secure/user?id=${id}`);
+  const data = await res.json();
+  document.getElementById("secure-result").textContent = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}
